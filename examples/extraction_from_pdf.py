@@ -1,14 +1,22 @@
 import os
 import sys
 from pathlib import Path
-from utils.get_keys import load_config
+# Assuming 'utils' is in a 'src' directory at the project root
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
+from src.utils.get_keys import load_config # Adjusted import
 import google.generativeai as genai
 
-current_dir = Path(__file__).parent.resolve()
-parent_dir = current_dir.parent
-sys.path.append(str(parent_dir))
+# current_dir = Path(__file__).parent.resolve()
+# parent_dir = current_dir.parent # This would be project root
+# sys.path.append(str(parent_dir))
 
-load_config('configs/config.yaml')
+try:
+    load_config('configs/config.yaml') # Assumes 'configs' is at project root
+except Exception as e:
+    print(f"Warning: Failed to load config 'configs/config.yaml'. Ensure it exists at project root or API keys are set in env. Error: {e}")
 
 genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 

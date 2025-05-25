@@ -1,5 +1,5 @@
 def get_prompt(max_marks):
-      marks_10= """
+    marks_10 = """
         You are an agent with access to a toolbox. Given a student’s question and answer, 
         you will determine the appropriate tool for evaluating the answer or provide direct feedback based on your knowledge. 
         You will generate the following JSON response:
@@ -79,10 +79,20 @@ def get_prompt(max_marks):
         Provide detailed feedback explaining why each mark was awarded or deducted.
         And also provide the correct answer from your side.
     """
-      if max_marks ==10:
-         return marks_10
+    # Return this prompt for any positive max_marks, as it's the only detailed one.
+    # Add a warning if max_marks is not 10, as the content is specific.
+    if max_marks > 0:
+        if max_marks != 10:
+            print(
+                f"Warning: Prompts in prompts.py are currently tailored for max_marks=10. Using this prompt for max_marks={max_marks}."
+            )
+        return marks_10
+    else:
+        print(f"Error: Invalid max_marks value: {max_marks}. Cannot retrieve prompt.")
+        return None  # Or raise an error
 
-agent_system_prompt_template = """
+
+AGENT_SYSTEM_PROMPT_TEMPLATE = """  # Renamed to UPPER_SNAKE_CASE
         You are an agent with access to a toolbox. Given a student’s question and answer, 
         you will determine the appropriate tool for evaluating the answer or provide direct feedback based on your knowledge. 
         You will generate the following JSON response:

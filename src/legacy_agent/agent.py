@@ -1,5 +1,5 @@
-# import os 
-# import sys 
+# import os
+# import sys
 # # current_dir = os.path.dirname(os.path.abspath(__file__))
 # # parent_dir = os.path.dirname(current_dir)
 # # sys.path.append(parent_dir)
@@ -95,7 +95,7 @@
 #                 # return tool(tool_input)
 
 #         print(colored(tool_input, 'cyan'))
-        
+
 #         return
 
 # # Example usage
@@ -119,16 +119,18 @@
 #         prompt = input("Ask me anything: ")
 #         if prompt.lower() == "exit":
 #             break
-    
+
 #         agent.work(prompt)
 
-import os 
-import sys 
+import os
+import sys
 import json
 from termcolor import colored
-from prompts import agent_system_prompt_template
-from ollama_models import GroqModel
-from toolbox import ExamEvaluatorToolBox
+from ..prompts import agent_system_prompt_template  # Adjusted import
+from .ollama_models import GroqModel  # Adjusted import
+from ..toolbox import (
+    ExamEvaluatorToolBox,
+)  # Adjusted import, assuming toolbox is in src
 
 
 class Agent:
@@ -158,37 +160,37 @@ class Agent:
         tool_descriptions = toolbox.tools()
         return tool_descriptions
 
-    def think(self, prompt,question,answer):
+    def think(self, prompt, question, answer):
         # Generate the response from the model
         tool_descriptions = self.prepare_tools()
-        agent_system_prompt = agent_system_prompt_template.format(tool_descriptions=tool_descriptions,question=question,answer=answer)
-        
+        agent_system_prompt = agent_system_prompt_template.format(
+            tool_descriptions=tool_descriptions, question=question, answer=answer
+        )
+
         model_instance = self.model_service(
             model=self.model_name,
             system_prompt=agent_system_prompt,
             temperature=0,
-            stop=self.stop
+            stop=self.stop,
         )
 
         agent_response_dict = model_instance.generate_text(prompt)
-        print({
-            "tool_choice": agent_response_dict.get("tool_choice", "no tool"),
-            "tool_input": agent_response_dict.get("tool_input", ""),
-            "marks_awarded": agent_response_dict.get("marks_awarded", {
-                "evaluation": "",
-                "score": 0,
-                "feedback": ""
-            })
-        })
+        print(
+            {
+                "tool_choice": agent_response_dict.get("tool_choice", "no tool"),
+                "tool_input": agent_response_dict.get("tool_input", ""),
+                "marks_awarded": agent_response_dict.get(
+                    "marks_awarded", {"evaluation": "", "score": 0, "feedback": ""}
+                ),
+            }
+        )
         # Make sure to fill in defaults if any key is missing
         return {
             "tool_choice": agent_response_dict.get("tool_choice", "no tool"),
             "tool_input": agent_response_dict.get("tool_input", ""),
-            "marks_awarded": agent_response_dict.get("marks_awarded", {
-                "evaluation": "",
-                "score": 0,
-                "feedback": ""
-            })
+            "marks_awarded": agent_response_dict.get(
+                "marks_awarded", {"evaluation": "", "score": 0, "feedback": ""}
+            ),
         }
 
     def work(self, question, answer):
@@ -204,8 +206,8 @@ class Agent:
         """
         # Combine the student's question and answer into a prompt
         prompt = f"Student's question: {question}\nStudent's answer: {answer}"
-        agent_response_dict = self.think(prompt,question,answer)
-        
+        agent_response_dict = self.think(prompt, question, answer)
+
         tool_choice = agent_response_dict.get("tool_choice")
         tool_input = agent_response_dict.get("tool_input")
         marks_awarded = agent_response_dict.get("marks_awarded")
@@ -220,25 +222,59 @@ class Agent:
         # Return the final evaluation and score
         return marks_awarded
 
+
 # Example usage
 if __name__ == "__main__":
-    from correction_tools import check_spelling, calculate_score, evaluate_answer, check_plagiarism
+    # If running as a script, sys.path might need adjustment to find parent 'src' modules
+    # For example, by adding project root to sys.path
+    # This is tricky for scripts inside packages if they rely on sibling packages not in PYTHONPATH.
+    # However, for now, let's assume it's run as part of a larger context where src is accessible
+    # or these tools are also moved/self-contained.
+    try:
+        from ..correction_tools import (
+            check_spelling,
+            calculate_score,
+            evaluate_answer,
+            check_plagiarism,
+        )  # Adjusted import
+    except ImportError:
+        # Fallback for direct script execution if ..correction_tools is not found
+        # This implies correction_tools.py might be in src/ or src/legacy_agent/
+        # If it's in src/, the above relative import is correct when agent.py is treated as part of a package.
+        # If it's also legacy and moved to src/legacy_agent, then from .correction_tools import ...
+        # For now, sticking to the assumption it's in src/
+        print(
+            "Warning: Could not import correction_tools using relative import from src. Ensure PYTHONPATH is set correctly if running as script."
+        )
+        # As a last resort for the __main__ block, if it's meant to be runnable standalone:
+        current_dir_for_main = os.path.dirname(os.path.abspath(__file__))
+        src_dir_for_main = os.path.dirname(current_dir_for_main)
+        if src_dir_for_main not in sys.path:
+            sys.path.append(src_dir_for_main)
+        from correction_tools import (
+            check_spelling,
+            calculate_score,
+            evaluate_answer,
+            check_plagiarism,
+        )
 
     tools = [evaluate_answer]
 
     # Uncomment below to run with GroqModel
     model_service = GroqModel
-    model_name = 'llama3-8b-8192'
+    model_name = "llama3-8b-8192"
     stop = "<|eot_id|>"
 
-    agent = Agent(tools=tools, model_service=model_service, model_name=model_name, stop=stop)
+    agent = Agent(
+        tools=tools, model_service=model_service, model_name=model_name, stop=stop
+    )
 
     while True:
         question = input("Enter the student's question: ")
         answer = input("Enter the student's answer: ")
-        
+
         if question.lower() == "exit" or answer.lower() == "exit":
             break
 
         result = agent.work(question, answer)
-        print(colored(json.dumps(result, indent=4), 'cyan'))
+        print(colored(json.dumps(result, indent=4), "cyan"))

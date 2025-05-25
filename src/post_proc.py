@@ -1,127 +1,123 @@
-# import json
-
-# def format_evaluation_reports(raw_data):
-#     formatted = {}
-#     for question_key, data in raw_data.items():
-#         report = data['evaluation_report']
-        
-#         # Extract key information
-#         lines = report.split('\n')
-#         question = 'N/A'
-#         answer = 'N/A'
-#         evaluation = 'N/A'
-#         total_score = 'N/A'
-#         strengths = []
-#         weaknesses = []
-#         current_section = None
-
-#         for line in lines:
-#             line = line.strip()
-#             if line.startswith('**Question:'):
-#                 question = line.split('**Question:')[1].strip()
-#             elif line.startswith('**Student Answer:'):
-#                 answer = line.split('**Student Answer:')[1].strip()
-#             elif line.startswith('**1. Evaluation:'):
-#                 evaluation = line.split('**1. Evaluation:')[1].strip()
-#             elif 'Total' in line and ':' in line:
-#                 total_score = line.split(':')[1].strip()
-#             elif '**3. Strengths:**' in line:
-#                 current_section = strengths
-#             elif '**4. Weaknesses:**' in line:
-#                 current_section = weaknesses
-#             elif current_section is not None and line.startswith('*'):
-#                 current_section.append(line)
-
-#         # Format the data
-#         formatted[question_key] = {
-#             'Question': question,
-#             'Student Answer': answer,
-#             'Evaluation': evaluation,
-#             'Total Score': total_score,
-#             'Strengths': strengths,
-#             'Weaknesses': weaknesses
-#         }
-    
-#     return formatted
-
-# # Load the JSON data
-# with open('evaluation_reports_gemini.json', 'r') as f:
-#     raw_data = json.load(f)
-
-# # Format the data
-# formatted_data = format_evaluation_reports(raw_data)
-
-# # Print the formatted data
-# print(json.dumps(formatted_data, indent=4))
-
-# # Save the formatted data to a new JSON file
-# with open('evaluation_reports_gemini_formatted.json', 'w') as f:
-#     json.dump(formatted_data, f, indent=4)
-
-
 import json
-import re
+import os
 
-def format_evaluation_reports(raw_data):
-    formatted = {}
-    for question_key, data in raw_data.items():
-        report = data['evaluation_report']
+# import re # Regex might not be needed if AI returns structured JSON
 
-        lines = report.split('\n')
-        question = 'N/A'
-        answer = 'N/A'
-        evaluation = 'N/A'
-        total_score = 'N/A'
-        strengths = []
-        weaknesses = []
-        current_section = None
 
-        question_match = re.search(r'\*\*Question:?\*\*(.*?)(?=\*\*|\n\n)', report, re.DOTALL)
-        answer_match = re.search(r'\*\*Student Answer:?\*\*(.*?)(?=\*\*|\n\n)', report, re.DOTALL)
+def format_evaluation_report_simple(evaluation_report_data):
+    """
+    Simple formatter for evaluation reports. Assumes evaluation_report_data is a dictionary
+    where each key is a question_key and the value is the direct JSON-parsed output
+    from the AI model for that question.
+    This function can be expanded to perform more complex formatting or aggregation.
+    """
+    processed_reports = {}
+    for question_key, report_details in evaluation_report_data.items():
+        if isinstance(report_details, dict) and "error" not in report_details:
+            # Example: Extract specific fields or ensure structure
+            # This is where you'd transform the AI's JSON output if needed.
+            # For now, we'll assume the AI's output per question is already well-structured.
+            processed_reports[question_key] = {
+                "evaluation": report_details.get("evaluation", "N/A"),
+                "score_breakdown": report_details.get("score_breakdown", {}),
+                "total_score_calculated": sum(
+                    report_details.get("score_breakdown", {}).values()
+                ),  # Example calculation
+                "strengths": report_details.get("strengths", "N/A"),
+                "weaknesses": report_details.get("weaknesses", "N/A"),
+                "spelling_errors": report_details.get("spelling_errors", 0),
+                "constructive_feedback": report_details.get(
+                    "constructive_feedback", "N/A"
+                ),
+                "original_question_details": report_details.get(
+                    "original_question_info"
+                ),  # If you add this in evaluator
+            }
+        elif isinstance(report_details, dict) and "error" in report_details:
+            processed_reports[question_key] = {
+                "error": report_details.get("error"),
+                "raw_response_snippet": report_details.get("raw_response", "")[:200]
+                + "...",
+            }
+        else:
+            # Fallback for unexpected structure
+            processed_reports[question_key] = {
+                "error": "Unexpected report format",
+                "original_data_snippet": str(report_details)[:200] + "...",
+            }
+    return processed_reports
 
-        if question_match:
-            question = question_match.group(1).strip()
-        if answer_match:
-            answer = answer_match.group(1).strip()
 
-        for line in lines:
-            line = line.strip()
-            if line.startswith('**1. Evaluation:'):
-                evaluation = line.split('**1. Evaluation:')[1].strip()
-            elif 'Total' in line and ':' in line:
-                total_score = line.split(':')[1].strip()
-            elif '**3. Strengths:**' in line:
-                current_section = strengths
-            elif '**4. Weaknesses:**' in line:
-                current_section = weaknesses
-            elif current_section is not None and line.startswith('*'):
-                current_section.append(line)
+def post_processing(evaluation_report_path, output_dir="Evaluation_bot"):
+    """
+    Loads an evaluation report, processes/formats it, and saves the result.
+    evaluation_report_path: Path to the JSON file generated by AIModelEvaluator.
+    output_dir: Directory to save the post-processed report.
+    """
+    print(f"\nStarting post-processing for: {evaluation_report_path}\n")
 
-        formatted[question_key] = {
-            'Question': question,
-            'Student Answer': answer,
-            'Evaluation': evaluation,
-            'Total Score': total_score,
-            'Strengths': strengths,
-            'Weaknesses': weaknesses
-        }
-    
-    return formatted
+    try:
+        with open(evaluation_report_path, "r") as f:
+            raw_evaluation_data = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: Evaluation report file not found at {evaluation_report_path}")
+        raise
+    except json.JSONDecodeError:
+        print(f"Error: Could not decode JSON from {evaluation_report_path}")
+        raise
 
-def post_processing(path):
-    print(f"\nPost Processing:{path}\n")
-    with open("Evaluation_bot\evaluation_reports_gemini.json", 'r') as f:
-        raw_data = json.load(f)
+    # The 'raw_evaluation_data' is expected to be a dictionary where keys are question numbers
+    # and values are the JSON objects (dictionaries) returned by the AI for each question.
+    formatted_data = format_evaluation_report_simple(raw_evaluation_data)
 
-    formatted_data = format_evaluation_reports(raw_data)
-    print(json.dumps(formatted_data, indent=4))
+    print("Formatted Evaluation Data Sample (first item):")
+    if formatted_data:
+        first_key = list(formatted_data.keys())[0]
+        print(json.dumps({first_key: formatted_data[first_key]}, indent=4))
 
-    for key, value in formatted_data.items():
-        if value['Question'] == 'N/A' or value['Student Answer'] == 'N/A':
-            print(f"Warning: Missing question or answer for {key}")
-       
-    outfile = 'Evaluation_bot/evaluation_reports_gemini_formatted.json'
-    with open(outfile, 'w') as f:
+    # Ensure output directory exists
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    base_eval_report_name = os.path.splitext(os.path.basename(evaluation_report_path))[
+        0
+    ]
+    # Example: evaluation_report_gemini.json -> final_processed_evaluation_report_gemini.json
+    output_filename = f"final_processed_{base_eval_report_name}.json"
+    output_file_path = os.path.join(output_dir, output_filename)
+
+    with open(output_file_path, "w") as f:
         json.dump(formatted_data, f, indent=4)
 
-    return outfile
+    print(f"Post-processed evaluation report saved to {output_file_path}")
+    return output_file_path
+
+
+# Example Usage (if you were to run this file directly for testing)
+# if __name__ == '__main__':
+#     # Create a dummy evaluation_reports_gemini.json for testing
+#     dummy_data = {
+#         "Question 1": {
+#             "evaluation": "correct",
+#             "score_breakdown": {"Content Accuracy": 5.0, "Comprehension": 3.0, "Clarity": 2.0},
+#             "strengths": "Clear and concise.",
+#             "weaknesses": "None apparent.",
+#             "spelling_errors": 0,
+#             "constructive_feedback": "Well done."
+#         },
+#         "Question 2": {
+#             "error": "Failed to parse model output as JSON",
+#             "raw_response": "Some malformed text..."
+#         }
+#     }
+#     dummy_input_path = "Evaluation_bot/evaluation_reports_gemini.json"
+#     if not os.path.exists("Evaluation_bot"):
+#         os.makedirs("Evaluation_bot")
+#     with open(dummy_input_path, 'w') as f:
+#         json.dump(dummy_data, f, indent=4)
+
+#     try:
+#         final_path = post_processing(dummy_input_path)
+#         print(f"Test completed. Final report at: {final_path}")
+#     except Exception as e:
+#         print(f"Test failed: {e}")
