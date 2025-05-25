@@ -2,13 +2,23 @@ import os
 import json
 import sys
 import requests
-from utils.get_keys import load_config
+# Assuming 'utils' and 'prompts' are in a 'src' directory at the project root
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.append(project_root)
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-sys.path.append(parent_dir)
+from src.utils.get_keys import load_config # Adjusted import
+from src.prompts import get_prompt # Adjusted import
 
-load_config('configs/config.yaml')
+# current_dir = os.path.dirname(os.path.abspath(__file__))
+# parent_dir = os.path.dirname(current_dir) # This would be project root
+# sys.path.append(parent_dir)
+
+try:
+    load_config('configs/config.yaml') # Assumes 'configs' is at project root
+except Exception as e:
+    print(f"Warning: Failed to load config 'configs/config.yaml'. Ensure it exists at project root or API keys are set in env. Error: {e}")
+
 
 from groq import Groq
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
@@ -106,8 +116,12 @@ if __name__ == "__main__":
         }
     }
 
-    from prompts import get_prompt
+    # from prompts import get_prompt # Already imported above
     agent_system_prompt_template = get_prompt(max_marks=10)
+    if agent_system_prompt_template is None:
+        print("Error: Could not load prompt template from src.prompts. Using fallback.")
+        agent_system_prompt_template = "You are an AI assistant."
+
 
     # Initialize the evaluator for Groq
     # groq_evaluator = AIModelEvaluator(
